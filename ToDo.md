@@ -1,0 +1,31 @@
+# 2020年GW中にやりたいこと
+1. フロントエンドの勉強
+	* html/cssの勉強
+	* JavaScriptの勉強
+		* progate受講済み
+		* Youtubeでゲーム制作過程を勉強  
+		[Akichon](https://www.youtube.com/channel/UCF2Kl5aL-_vcwaNhUf7YqbA)
+	* Bootstrapを使ってみる
+	* Wordpressを使ってみる
+1. フロントエンドのアウトプット
+	* ゲームを作る
+		* テトリス
+		* ぷよぷよ
+	* ホームページ作成
+		* ポートフォリオサイト
+			* 経歴・自己紹介
+		* 競プロライブラリまとめ
+	* ブログ（WordPress？自作？）
+		* 競プロ精進日記
+		* ゲーム制作過程
+		* 勉強内容
+	* Markdown変換器
+1. バックエンドの勉強
+	* Ruby
+	* Ruby on Rails
+	* データベース（SQL）
+		* 全部progate
+1. バックエンドのアウトプット
+	* ゲームにランキング機能をつける
+		* テトリス：40ライン、n分スコアアタック
+		* ぷよぷよ：n分スコアアタック？

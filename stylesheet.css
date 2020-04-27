@@ -1,8 +1,41 @@
-h1 {
-	color: #ff0000;
-	font-size: 40px;
+:root {
+	--back: #2D2D2D;
+	--main: #dddddd;
+	--acc1: #FF5917;
+	--acc2: #F9D46B;
+}
+
+body {
+	background-color: var(--back);
+	color: var(--main);
 	font-family: sans-serif;
-	background-color: #f3f372;
-	height: 60px;
-	width: 200px;
+	font-size: 18px;
+}
+
+.wrapper {
+	margin: 20px;
+}
+
+h1 {
+	color: var(--acc1);
+	font-size: 40px;
+	
+}
+
+h2 {
+	color: var(--acc1);
+	font-size: 24px;
+}
+
+a {
+	color: var(--acc2);
+}
+
+.icon {
+	text-decoration: none;
+	font-size: 1em;
+}
+
+.twitter {
+	color: #1DA1F2;
 }
