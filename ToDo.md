@@ -18,8 +18,9 @@
 	* ブログ（WordPress？自作？）
 		* 競プロ精進日記
 		* ゲーム制作過程
-		* 勉強内容
-	* Markdown変換器
+		* HP作成過程
+			* HP始めるにはgithubがおすすめ
+	* Markdown→html変換器
 1. バックエンドの勉強
 	* Ruby
 	* Ruby on Rails

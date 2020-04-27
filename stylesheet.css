@@ -16,15 +16,27 @@ body {
 	margin: 20px;
 }
 
+header {
+	padding: 10px 20px;
+	background-color: #ddd;
+}
+
+footer {
+	text-align: center;
+	border-top: 1px solid var(--main);
+	margin-top: 40px;
+}
+
 h1 {
 	color: var(--acc1);
 	font-size: 40px;
-	
 }
 
 h2 {
 	color: var(--acc1);
 	font-size: 24px;
+	border-bottom: 2px solid var(--acc1);
+	margin-top: 40px;
 }
 
 a {
