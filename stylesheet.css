@@ -1,8 +1,8 @@
 :root {
-	--back: #2D2D2D;
-	--main: #dddddd;
-	--acc1: #FF5917;
-	--acc2: #F9D46B;
+	--back: #E7E8F2;
+	--main: #373737;
+	--acc1: #3B5998;
+	--acc2: #E6781E;
 }
 
 body {
@@ -13,12 +13,13 @@ body {
 }
 
 .wrapper {
-	margin: 20px;
+	width: 1000px;
+	margin: 0 auto;
 }
 
 header {
-	padding: 10px 20px;
-	background-color: #ddd;
+	padding: 5px 20px;
+	background-color: var(--acc1);
 }
 
 footer {
@@ -28,19 +29,56 @@ footer {
 }
 
 h1 {
-	color: var(--acc1);
 	font-size: 40px;
+	color: var(--back);
 }
 
 h2 {
 	color: var(--acc1);
-	font-size: 24px;
-	border-bottom: 2px solid var(--acc1);
-	margin-top: 40px;
+	font-size: 32px;
+	border-bottom: 3px solid var(--acc1);
+	margin-top: 30px;
+	margin-bottom: 0;
 }
+
+h3 {
+	padding: 0.25em 0.5em;
+	background: transparent;
+	border-left: solid 5px var(--acc1);
+	margin-bottom: 0;
+  }
 
 a {
 	color: var(--acc2);
+}
+
+ul {
+	position: relative;
+}
+
+ul li {
+	line-height: 1.5;
+	list-style-type: none!important;
+	margin-bottom: 8px;
+}
+ul li ul li {
+	margin-bottom: 2px;
+}
+
+ul li:before {
+	font-family: 'Font Awesome 5 Free';
+	font-weight: 900;
+	content: '\f138';
+	position: absolute;
+	left : 0.9em;	/*左端からのアイコンまでの距離*/
+	color: var(--acc1);
+
+}
+
+ul li ul li:before {
+	content: '\f0da';
+	font-weight: 900;
+	position: absolute;
 }
 
 .icon {
