@@ -23,6 +23,9 @@ header {
 	background-color: var(--acc1);
 }
 
+.content {
+	margin-top: 30px;
+}
 footer {
 	text-align: center;
 	border-top: 1px solid var(--main);
@@ -38,7 +41,6 @@ h2 {
 	color: var(--acc1);
 	font-size: 32px;
 	border-bottom: 3px solid var(--acc1);
-	margin-top: 30px;
 	margin-bottom: 0;
 }
 
@@ -74,7 +76,6 @@ ul li:before {
 	left : 0.9em;	/*左端からのアイコンまでの距離*/
 	font-size: 1em;
 	color: var(--acc1);
-
 }
 
 ul li ul li:before {
@@ -90,4 +91,16 @@ ul li ul li:before {
 
 .twitter {
 	color: #1DA1F2;
+}
+
+.f-container{
+	display:flex;
+	flex-direction: row;
+}
+
+.f-game {
+	width: 30%;
+}
+.f-outline {
+	width: 70%;
 }
