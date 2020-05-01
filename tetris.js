@@ -11,14 +11,16 @@ const key = {
 	right: 1,
 	up: 2,
 	down: 3,
-	space: 4
+	space: 4,
+	MAX: 5
 };
-let isPressed = new Array(5).fill(false);
+let isPressed = new Array(key.MAX).fill(false);
 let can = document.getElementById("can");
 let con = can.getContext("2d");
 let field = new Array(FIELD_ROW);
 let frameCount = 0;
 let startTime;
+let isRotated = false;	// スペースキーが押された時に回転したかどうか（押しっぱなしで回転することを防ぐ）
 let mino = [
 	[0, 0, 0, 0],
 	[1, 1, 0, 0],
@@ -40,6 +42,8 @@ function init() {
 	for (let y = 0; y < FIELD_ROW; y++) {
 		field[y] = new Array(FIELD_COL).fill(0);
 	}
+	// debug
+	field[5][5] = 1;
 }
 
 function drawBlock(x, y, color) {
@@ -70,12 +74,44 @@ function drawField() {
 	}
 }
 
+function checkMove(mx, my, newMino) {
+	if(newMino == undefined) newMino = mino;
+	for (let y = 0; y < MINO_SIZE; y++) {
+		for (let x = 0; x < MINO_SIZE; x++) {
+			let nx = block.x + mx + x;
+			let ny = block.y + my + y;
+			if (newMino[y][x]) {
+				if (nx < 0 || nx >= FIELD_COL || ny < 0 || ny >= FIELD_ROW || field[nx][ny]) return false;
+			}
+		}
+	}
+	return true;
+}
+function rotateBlock() {
+	let newMino = [];
+	for (let y = 0; y < MINO_SIZE; y++) {
+		newMino[y] = [];
+		for (let x = 0; x < MINO_SIZE; x++) {
+			newMino[y][x] = mino[MINO_SIZE-x-1][y];
+		}
+	}
+	return newMino;
+}
 
 function update() {
-	if(isPressed[key.left]) block.x--;
-	if(isPressed[key.right]) block.x++;
-	if(isPressed[key.up]) block.y--;
-	if(isPressed[key.down]) block.y++;
+	if(frameCount%3 == 0) {
+		if (isPressed[key.left]) if (checkMove(-1, 0)) block.x--;
+		if (isPressed[key.right]) if (checkMove(1, 0)) block.x++;
+		if (isPressed[key.up]) if (checkMove(0, -1)) block.y--;
+		if (isPressed[key.down]) if (checkMove(0, 1)) block.y++;
+	}
+	if (!isRotated && isPressed[key.space]) {
+		let newMino = rotateBlock();
+		isRotated = true;
+		if (checkMove(0, 0, newMino)) {
+			mino = newMino;
+		}
+	}
 }
 
 function draw() {
@@ -87,7 +123,7 @@ function draw() {
 	}
 	for (let y = 0; y < MINO_SIZE; y++) {
 		for (let x = 0; x < MINO_SIZE; x++) {
-			drawBlock(block.x + x, block.y + y, mino[y][x]);
+			if(mino[y][x]) drawBlock(block.x + x, block.y + y, mino[y][x]);
 		}
 	}
 	con.font = "20px sans-serif";
@@ -153,6 +189,7 @@ document.onkeyup = function (e) {
 			break;
 		case 32: // スペース
 			isPressed[key.space] = false;
+			isRotated = false;
 			break;
 	}
 }
