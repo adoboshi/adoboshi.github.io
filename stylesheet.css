@@ -99,12 +99,12 @@ ul li ul li:before {
 }
 
 .f-game {
-	width: 30%;
+	width: 50%;
 	min-width: 300px;
 	text-align: center;
 }
 .f-outline {
-	width: 70%;
+	width: 50%;
 }
 
 @media (max-width: 600px) {
