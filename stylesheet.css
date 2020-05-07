@@ -96,15 +96,16 @@ ul li ul li:before {
 
 .f-container{
 	display:flex;
+	flex-direction: column;
 }
 
 .f-game {
-	width: 50%;
+	width: 100%;
 	min-width: 300px;
 	text-align: center;
 }
 .f-outline {
-	width: 50%;
+	width: 100%;
 }
 
 @media (max-width: 600px) {

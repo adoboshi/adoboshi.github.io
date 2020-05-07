@@ -4,9 +4,14 @@ const FIELD_ROW = 30;
 const FIELD_ROW_DISPLAY = 20;
 const FIELD_COL = 10;
 const SCREEN_HEIGHT = BLOCK_SIZE * FIELD_ROW_DISPLAY;
-const SCREEN_WIDTH = BLOCK_SIZE * FIELD_COL + 6 * BLOCK_SIZE;
+const HOLD_WIDTH = 6 * BLOCK_SIZE;
+const FIELD_WIDTH = BLOCK_SIZE * FIELD_COL;
+const NEXT_WIDTH = 6 * BLOCK_SIZE;
+const SCREEN_WIDTH = FIELD_WIDTH + NEXT_WIDTH + HOLD_WIDTH;
 const FREE_FALL_SPEED = 500;
-const NEXT_DISPLAY = 5;
+const FIX_INTERVAL_MAX = 500;	// ミノが設置してから固定されるまでの時間[ms]
+const FIX_MOVE_COUNT_MAX = 15;
+const NEXT_DISPLAY_NUM = 6;
 
 const KEY = {
 	left: 0,
@@ -15,7 +20,8 @@ const KEY = {
 	down: 3,
 	rotateCW: 4,
 	rotateCCW: 5,
-	MAX: 6
+	hold: 6,
+	MAX: 7
 };
 const TYPE = {
 	NON: 0,
@@ -90,28 +96,39 @@ let can = document.getElementById("can");
 let con = can.getContext("2d");
 let field = new Array(FIELD_ROW);
 let next = new Array();
+let hold;
 let frameCount = 0;
 let startTime;
 let isRotatedCW = false;	// スペースキーが押された時に回転したかどうか（押しっぱなしで回転することを防ぐ）
 let isRotatedCCW = false;	// スペースキーが押された時に回転したかどうか（押しっぱなしで回転することを防ぐ）
 let isHardDropped = false;	// ハードドロップしたか
+let isHolded = false;	// holdしたか
 let gameOver = false;
-let pastTime;
+let lineCount = 0;
+let fixInterval = 0;
+let fixMoveCount = 0;	// 移動か回転が行われるたびに+1（下に落下すると0に戻る）。FIX_MOVE_COUNT_MAXに達すると強制設置
+let lowestHeight;	// そのミノが経験した最も低い高さ。最小値が更新されない場合、落下してもfixMoveCountを0にしない（無限回しの防止）
+let pastTime = 0;
 let block = new Object();
+
+function setBlock(type) {
+	block.type = type;
+	block.shape = MINO[type].shape;
+	block.color = MINO[type].color;
+	block.size = block.shape.length;
+	block.x = Math.floor(FIELD_COL / 2 - block.size / 2);
+	block.y = FIELD_ROW - FIELD_ROW_DISPLAY - 2;
+}
 
 // 新しいブロックの生成
 function spwanBlock() {
 	if (gameOver) return;
-	if (next.length <= NEXT_DISPLAY) generateNext();
-	block.type = next.shift();
-	block.shape = MINO[block.type].shape;
-	block.color = MINO[block.type].color;
-	block.size = block.shape.length;
-	block.x = Math.floor(FIELD_COL / 2 - block.size / 2);
-	block.y = FIELD_ROW - FIELD_ROW_DISPLAY - 2;
-	if (!canMove(0, 0)) {
-		gameOver = true;
-	}
+	if (next.length <= NEXT_DISPLAY_NUM) generateNext();
+	setBlock(next.shift());
+	fixInterval = pastTime;
+	fixMoveCount = 0;
+	lowestHeight = block.y;
+	if (!canMove(0, 0)) gameOver = true;
 }
 
 function generateNext() {
@@ -166,7 +183,7 @@ function fixBlock() {
 				if (field[ny][nx] === TYPE.NON) {
 					field[ny][nx] = block.type;
 				}
-				if (nx => 0 && nx < FIELD_COL && ny >= (FIELD_ROW - FIELD_ROW_DISPLAY) && ny < FIELD_ROW) {
+				if (nx >= 0 && nx < FIELD_COL && ny >= (FIELD_ROW - FIELD_ROW_DISPLAY) && ny < FIELD_ROW) {
 					isOffScreen = false;
 				}
 			}
@@ -176,10 +193,10 @@ function fixBlock() {
 	if (isOffScreen) gameOver = true;
 	checkClear();
 	spwanBlock();
+	isHolded = false;
 }
 
 function checkClear() {
-	let lineCount = 0;
 	for (let y = 0; y < FIELD_ROW; y++) {
 		let isFilled = true;
 		for (let x = 0; x < FIELD_COL; x++) {
@@ -197,21 +214,24 @@ function checkClear() {
 			}
 		}
 	}
-	return lineCount;
 }
 
 function freeFall() {
 	if (gameOver) return;
 	if (canMove(0, 1)) {
 		block.y++;
-	} else {
-		fixBlock();
+		fixInterval = pastTime;
+		if (lowestHeight < block.y) {
+			fixMoveCount = 0;
+		}
+		lowestHeight = Math.max(lowestHeight, block.y);
 	}
 	draw();
 }
 
 // ミノの回転（dir: 0でCW、1でCCW）
 function rotateBlock(dir) {
+	if (block.type === TYPE.O) return;
 	let newMino = [];
 	for (let y = 0; y < block.size; y++) {
 		newMino[y] = [];
@@ -222,15 +242,32 @@ function rotateBlock(dir) {
 	}
 	if (canMove(0, 0, newMino)) {
 		block.shape = newMino;
+		fixInterval = pastTime;
+		fixMoveCount++;
 	}
 }
 
 function update() {
 	if (gameOver) return;
 	if (frameCount % 3 == 0) {
-		if (isPressed[KEY.left]) if (canMove(-1, 0)) block.x--;
-		if (isPressed[KEY.right]) if (canMove(1, 0)) block.x++;
-		if (isPressed[KEY.down]) if (canMove(0, 1)) block.y++;
+		if (isPressed[KEY.left]) if (canMove(-1, 0)) {
+			block.x--;
+			fixInterval = pastTime;
+			fixMoveCount++;
+		}
+		if (isPressed[KEY.right]) if (canMove(1, 0)) {
+			block.x++;
+			fixInterval = pastTime;
+			fixMoveCount++;
+		}
+		if (isPressed[KEY.down]) if (canMove(0, 1)) {
+			block.y++;
+			fixInterval = pastTime;
+			if (lowestHeight < block.y) {
+				fixMoveCount = 0;
+			}
+			lowestHeight = Math.max(lowestHeight, block.y);
+		}
 	}
 	if (!isHardDropped && isPressed[KEY.hardDrop]) {
 		isHardDropped = true;
@@ -250,64 +287,139 @@ function update() {
 		isRotatedCCW = true;
 		rotateBlock(1);
 	}
+	if (!isHolded && isPressed[KEY.hold]) {
+		isHolded = true;
+		if (hold === undefined) {
+			hold = block.type;
+			spwanBlock();
+		} else {
+			let tmp = hold;
+			hold = block.type;
+			setBlock(tmp);
+		}
+	}
+	// 設置
+	if (pastTime - fixInterval > FIX_INTERVAL_MAX || fixMoveCount > FIX_MOVE_COUNT_MAX) {
+		if (!canMove(0, 1)) {
+			fixBlock();
+		}
+	}
 }
 
 function zeroPadding(num, len) {
 	return (Array(len).join('0') + num).slice(-len);
 }
 
-function drawBlock(x, y, color, stroke) {
+function drawBlock(px, py, color, stroke) {
 	if (stroke === undefined) stroke = "black";
-	let px = x * BLOCK_SIZE;
-	let py = (y - (FIELD_ROW - FIELD_ROW_DISPLAY)) * BLOCK_SIZE;
 	con.fillStyle = color;
 	con.fillRect(px, py, BLOCK_SIZE, BLOCK_SIZE);
 	con.strokeStyle = stroke;
 	con.strokeRect(px, py, BLOCK_SIZE, BLOCK_SIZE);
 }
 
-function drawTime() {
-	let msec = pastTime % 1000;
-	let sec = pastTime / 1000;
-	let min = sec / 60;
-	sec %= 60;
-	msec = Math.floor(msec);
-	sec = Math.floor(sec);
-	min = Math.floor(min);
-	con.font = "20px sans-serif";
-	con.fillStyle = "black";
-	con.fillText(`${zeroPadding(min, 2)}:${zeroPadding(sec, 2)}.${zeroPadding(msec, 3)}`, 10, 20);
+function drawField(x, y, color, stroke) {
+	let px = x * BLOCK_SIZE + HOLD_WIDTH;
+	let py = (y - (FIELD_ROW - FIELD_ROW_DISPLAY)) * BLOCK_SIZE;
+	drawBlock(px, py, color, stroke);
 }
 
 function drawNext() {
-	for (let i = 0; i < NEXT_DISPLAY; i++) {
-		for (let y = 0; y < MINO[next[i]].shape.length; y++) {
-			for (let x = 0; x < MINO[next[i]].shape.length; x++) {
-				if (MINO[next[i]].shape[y][x]) {
-					if (MINO[next[i]].shape.length <= 2) {
-						// Oのための位置調整
-						drawBlock(FIELD_COL + x + 2, 1 + i * 3 + y + (FIELD_ROW - FIELD_ROW_DISPLAY), MINO[next[i]].color);
-					} else {
-						drawBlock(FIELD_COL + x + 1, 1 + i * 3 + y + (FIELD_ROW - FIELD_ROW_DISPLAY), MINO[next[i]].color);
-					}
+	for (let i = 0; i < NEXT_DISPLAY_NUM; i++) {
+		let shape = MINO[next[i]].shape;
+		for (let y = 0; y < shape.length; y++) {
+			for (let x = 0; x < shape.length; x++) {
+				if (shape[y][x]) {
+					let px = HOLD_WIDTH + FIELD_WIDTH + NEXT_WIDTH / 2 - (shape.length / 2 - x) * BLOCK_SIZE;
+					let py = (i * 3 + y + 2) * BLOCK_SIZE;
+					drawBlock(px, py, MINO[next[i]].color);
 				}
 			}
 		}
 	}
 }
 
+function drawHold() {
+	if (hold === undefined) return;
+	let shape = MINO[hold].shape;
+	for (let y = 0; y < shape.length; y++) {
+		for (let x = 0; x < shape.length; x++) {
+			if (shape[y][x]) {
+				let px = HOLD_WIDTH / 2 - (shape.length / 2 - x) * BLOCK_SIZE;
+				let py = (y + 2) * BLOCK_SIZE;
+				drawBlock(px, py, MINO[hold].color);
+			}
+		}
+	}
+
+}
+
+function drawText() {
+	let fontSize = 30;
+	con.font = fontSize + "px sans-serif";
+	con.fillStyle = "white";
+	let w, s;
+	s = "HOLD";
+	w = con.measureText(s).width;
+	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 40);
+	s = "TIME";
+	w = con.measureText(s).width;
+	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 180);
+	s = "LINE";
+	w = con.measureText(s).width;
+	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 300);
+	s = "NEXT";
+	w = con.measureText(s).width;
+	con.fillText(s, HOLD_WIDTH + FIELD_WIDTH + NEXT_WIDTH / 2 - w / 2, 40);
+
+	// drawLines();
+	s = zeroPadding(lineCount, 4);
+	w = con.measureText(s).width;
+	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 300 + fontSize + 10);
+
+	// drawTime();
+	let msec = (pastTime % 1000) / 10;
+	let sec = pastTime / 1000;
+	let min = sec / 60;
+	sec %= 60;
+	msec = Math.floor(msec);
+	sec = Math.floor(sec);
+	min = Math.floor(min);
+	s = `${zeroPadding(min, 2)}:${zeroPadding(sec, 2)}.${zeroPadding(msec, 2)}`;
+	w = con.measureText(s).width;
+	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 180 + fontSize + 10);
+
+	// ゲームオーバー
+	if (gameOver) {
+		con.fillStyle = "black";
+		let fontSize = 80;
+		con.font = fontSize + "px sans-serif";
+		s = "GAME";
+		w = con.measureText(s).width;
+		// con.strokeText(s, HOLD_WIDTH + FIELD_WIDTH / 2 - w / 2, SCREEN_HEIGHT / 2 - fontSize / 2);
+		con.fillText(s, HOLD_WIDTH + FIELD_WIDTH / 2 - w / 2, SCREEN_HEIGHT / 2 - fontSize / 2);
+		s = "OVER";
+		w = con.measureText(s).width;
+		// con.strokeText(s, HOLD_WIDTH + FIELD_WIDTH / 2 - w / 2, SCREEN_HEIGHT / 2 + fontSize / 2);
+		con.fillText(s, HOLD_WIDTH + FIELD_WIDTH / 2 - w / 2, SCREEN_HEIGHT / 2 + fontSize / 2);
+	}
+}
+
 function draw() {
-	con.clearRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+	// con.clearRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+	con.fillStyle = "#333";
+	con.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
 	// 背景の描画
 	for (let y = FIELD_ROW - FIELD_ROW_DISPLAY; y < FIELD_ROW; y++) {
 		for (let x = 0; x < FIELD_COL; x++) {
-			drawBlock(x, y, "white", "gray");
+			drawField(x, y, "white", "gray");
 		}
 	}
 	// フィールドの描画
 	for (let y = FIELD_ROW - FIELD_ROW_DISPLAY; y < FIELD_ROW; y++) {
 		for (let x = 0; x < FIELD_COL; x++) {
-			if (field[y][x]) drawBlock(x, y, MINO[field[y][x]].color);
+			if (field[y][x]) drawField(x, y, MINO[field[y][x]].color);
 		}
 	}
 	// ゴーストの位置の計算
@@ -321,24 +433,15 @@ function draw() {
 		for (let x = 0; x < block.size; x++) {
 			if (block.shape[y][x]) {
 				// Ghost
-				if (!gameOver) drawBlock(block.x + x, block.y + y + bottom, "#777", "#222");
+				if (!gameOver) drawField(block.x + x, block.y + y + bottom, "#777", "#222");
 				// 操作中のミノ
-				drawBlock(block.x + x, block.y + y, block.color);
+				drawField(block.x + x, block.y + y, block.color);
 			}
 		}
 	}
-	drawTime();
 	drawNext();
-	if (gameOver) {
-		let s = "GAME OVER";
-		con.font = "40px sans-serif";
-		let w = con.measureText(s).width;
-		let x = SCREEN_WIDTH / 2 - w / 2;
-		let y = SCREEN_HEIGHT / 2 - 20;
-		con.strokeText(s, x, y);
-		con.fillStyle = "red";
-		con.fillText(s, x, y);
-	}
+	drawHold();
+	drawText();
 }
 
 
@@ -381,7 +484,7 @@ document.onkeydown = function (e) {
 			isPressed[KEY.down] = true;
 			break;
 		case 32: // スペース
-			isPressed[KEY.rotateCW] = true;
+			isPressed[KEY.hold] = true;
 			break;
 		case 90: // Z
 			isPressed[KEY.rotateCCW] = true;
@@ -409,8 +512,7 @@ document.onkeyup = function (e) {
 			isPressed[KEY.down] = false;
 			break;
 		case 32: // スペース
-			isPressed[KEY.rotateCW] = false;
-			isRotatedCW = false;
+			isPressed[KEY.hold] = false;
 			break;
 		case 90: // Z
 			isPressed[KEY.rotateCCW] = false;
