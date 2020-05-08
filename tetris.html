@@ -17,27 +17,44 @@
 		<div class="f-outline">
 			<h2 class="tetris">テトリス</h2>
 			<p>
-				現在制作中（5/1）<br>
-				JavaScriptで作っています。<br>
-				<a href="https://youtu.be/LJlKaTwtSdI" target="_brank">Akichonさんの動画</a>を大いに参考にしています。
+				JavaScriptで作りました。製作期間は約一週間。<br>
+				ルールはテトリスのガイドラインに（ほぼ）準拠しているはず。
 			</p>
 			<h3>操作方法</h3>
 			<ul>
-				<li>移動：矢印キー</li>
-				<li>回転：スペース</li>
+				<li>左右移動：←、→</li>
+				<li>右回転：X</li>
+				<li>左回転：Z</li>
+				<li>ソフトドロップ：↓</li>
+				<li>ハードドロップ：↑</li>
+				<li>ホールド：スペース</li>
 			</ul>
-			<h3>ToDo</h3>
+			<h3>参考にしたサイト</h3>
 			<ul>
-				<li>ひとまず完成させる</li>
-				<li>詰める（SRS、Tスピン、パフェ、etc）
-					<ul>
-						<li><a href="https://qiita.com/namn1125/items/15ddea322c086aa1b0d3" target="_brank">ワールドルールテトリスの作り方またはRust入門した感想的な何か</a> - Qiita @namn1125さん</li>
-						<li><a href="https://tetrisch.github.io/main/srs.html" target="_brank">SRS Super Rotation System</a> - Tetrisチャンネル</li>
-						<li><a href="https://qiita.com/ki_ki33/items/35566f052af7b916607b" target="_brank">テトリス（tetris）のガイドラインを理解する</a> - Qiita @ki_ki33さん</li>
-						<li><a href="http://waka.nu/tetris/howtotspin/index.html" target="_brank">各種回転入れ</a> - 喜竹屋本舗</li>
-					</ul>
+				<li>
+					<a href="https://youtu.be/LJlKaTwtSdI" target="_brank">プログラミング講座 第13回【テトリスを作る(1)/JavaScript】</a> -
+					Youtube, Akichonさん
+					<p>JavaScriptでゲームを作る方法をこの動画で学びました。テトリスが完成するまでの過程を全て見ることができ、大変参考になりました。</p>
 				</li>
-				<li>40ラインタイムランキング</li>
+				<li>
+					<a href="https://qiita.com/ki_ki33/items/35566f052af7b916607b"
+						target="_brank">テトリス（tetris）のガイドラインを理解する</a> - Qiita, @ki_ki33さん
+					<p>テトリスの公式ルール（＝ガイドライン）がわかりやすく解説されています。ここで紹介されている要素は全て実装しました。</p>
+				</li>
+				<li>
+					<a href="https://tetrisch.github.io/main/srs.html" target="_brank">SRS (Super Rotation System)</a> -
+					Tetrisチャンネルさん
+					<p>ガイドラインに含まれる項目のうち、SRS（スーパーローテーションシステム）の内容が具体的に示されています。SRSによりTスピンなどの回転入れが可能になります。</p>
+				</li>
+				<li>
+					<a href="https://qiita.com/namn1125/items/15ddea322c086aa1b0d3"
+						target="_brank">ワールドルールテトリスの作り方またはRust入門した感想的な何か</a> - Qiita, @namn1125さん
+					<p>Rustでガイドライン準拠テトリスを作られた先駆者様（？）です。この記事を読んで各機能の実装のイメージがつかめました。</p>
+				</li>
+				<li>
+					<a href="http://waka.nu/tetris/" target="_brank">テンプレ積み保管庫</a> - 喜竹屋本舗さん
+					<p>各ミノの回転入れの形やTスピンの詳細などが載っています。</p>
+				</li>
 			</ul>
 
 		</div>

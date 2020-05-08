@@ -9,8 +9,9 @@ const FIELD_WIDTH = BLOCK_SIZE * FIELD_COL;
 const NEXT_WIDTH = 6 * BLOCK_SIZE;
 const SCREEN_WIDTH = FIELD_WIDTH + NEXT_WIDTH + HOLD_WIDTH;
 const FREE_FALL_SPEED = 500;
-const FIX_INTERVAL_MAX = 500;	// ミノが設置してから固定されるまでの時間[ms]
+const FIX_INTERVAL_MAX = 500;	// ミノが接地してから固定されるまでの時間[ms]
 const FIX_MOVE_COUNT_MAX = 15;
+const AUTO_REPEAT_DELAY_MAX = 200;	// 横を押しっぱなしにした時に、
 const NEXT_DISPLAY_NUM = 6;
 
 const KEY = {
@@ -103,11 +104,16 @@ let isRotatedCW = false;	// スペースキーが押された時に回転した�
 let isRotatedCCW = false;	// スペースキーが押された時に回転したかどうか（押しっぱなしで回転することを防ぐ）
 let isHardDropped = false;	// ハードドロップしたか
 let isHolded = false;	// holdしたか
+let isMovedRight = false;	// 右移動したか
+let isMovedLeft = false;	// 左移動したか
 let gameOver = false;
 let lineCount = 0;
+let TspinCount = 0;
+let isTspin = false;
 let fixInterval = 0;
 let fixMoveCount = 0;	// 移動か回転が行われるたびに+1（下に落下すると0に戻る）。FIX_MOVE_COUNT_MAXに達すると強制設置
 let lowestHeight;	// そのミノが経験した最も低い高さ。最小値が更新されない場合、落下してもfixMoveCountを0にしない（無限回しの防止）
+let autoRepeatDelay = 0;	// AUTO_REPEAT_DELAY_MAX未満のときはオートリピートしない
 let pastTime = 0;
 let block = new Object();
 
@@ -118,6 +124,7 @@ function setBlock(type) {
 	block.size = block.shape.length;
 	block.x = Math.floor(FIELD_COL / 2 - block.size / 2);
 	block.y = FIELD_ROW - FIELD_ROW_DISPLAY - 2;
+	block.dir = 0;	// 0: Noreth, 1: East, 2: South, 3: West
 }
 
 // 新しいブロックの生成
@@ -127,10 +134,12 @@ function spwanBlock() {
 	setBlock(next.shift());
 	fixInterval = pastTime;
 	fixMoveCount = 0;
+	isTspin = false;
 	lowestHeight = block.y;
 	if (!canMove(0, 0)) gameOver = true;
 }
 
+// 配列nextにネクストを生成する（７種１巡）
 function generateNext() {
 	let perm = new Array(TYPE.MAX);
 	for (let i = 1; i < TYPE.MAX; i++) perm[i] = i;
@@ -207,6 +216,7 @@ function checkClear() {
 		}
 		if (isFilled) {
 			lineCount++;
+			if (isTspin) TspinCount++;
 			for (let ny = y; ny > 0; ny--) {
 				for (let nx = 0; nx < FIELD_COL; nx++) {
 					field[ny][nx] = field[ny - 1][nx];
@@ -229,46 +239,188 @@ function freeFall() {
 	draw();
 }
 
-// ミノの回転（dir: 0でCW、1でCCW）
+// ミノの回転（dir: 1でCW、-1でCCW）
 function rotateBlock(dir) {
 	if (block.type === TYPE.O) return;
+
 	let newMino = [];
 	for (let y = 0; y < block.size; y++) {
 		newMino[y] = [];
 		for (let x = 0; x < block.size; x++) {
-			if (dir === 0) newMino[y][x] = block.shape[block.size - x - 1][y];
-			if (dir === 1) newMino[y][x] = block.shape[x][block.size - y - 1];
+			if (dir === 1) newMino[y][x] = block.shape[block.size - x - 1][y];
+			if (dir === -1) newMino[y][x] = block.shape[x][block.size - y - 1];
 		}
 	}
-	if (canMove(0, 0, newMino)) {
+	// SRS
+	let nextDirction = (block.dir + dir + 4) % 4;
+	let canRotate = false;
+	let nx = 0, ny = 0;
+	if (block.type !== TYPE.I) {
+		if (nextDirction === 3 || nextDirction === 1) {
+			let mx = ((nextDirction === 3) ? 1 : -1);
+			if (canMove(0, 0, newMino)) canRotate = true, nx = 0, ny = 0;
+			else if (canMove(mx, 0, newMino)) canRotate = true, nx = mx, ny = 0;
+			else if (canMove(mx, -1, newMino)) canRotate = true, nx = mx, ny = -1;
+			else if (canMove(0, 2, newMino)) canRotate = true, nx = 0, ny = 2;
+			else if (canMove(mx, 2, newMino)) canRotate = true, nx = mx, ny = 2;
+		} else {
+			let mx;
+			if (nextDirction === 0) mx = dir * -1;
+			else mx = dir;
+			if (canMove(0, 0, newMino)) canRotate = true, nx = 0, ny = 0;
+			else if (canMove(mx, 0, newMino)) canRotate = true, nx = mx, ny = 0;
+			else if (canMove(mx, 1, newMino)) canRotate = true, nx = mx, ny = 1;
+			else if (canMove(0, -2, newMino)) canRotate = true, nx = 0, ny = -2;
+			else if (canMove(mx, -2, newMino)) canRotate = true, nx = mx, ny = -2;
+		}
+	} else {
+		if (nextDirction === 0) {
+			if (dir === 1) {
+				if (canMove(0, 0, newMino)) canRotate = true, nx = 0, ny = 0;
+				else if (canMove(-2, 0, newMino)) canRotate = true, nx = -2, ny = 0;
+				else if (canMove(1, 0, newMino)) canRotate = true, nx = 1, ny = 0;
+				else if (canMove(1, 2, newMino)) canRotate = true, nx = 1, ny = 2;
+				else if (canMove(-2, -1, newMino)) canRotate = true, nx = -2, ny = -1;
+			} else if (dir === -1) {
+				if (canMove(0, 0, newMino)) canRotate = true, nx = 0, ny = 0;
+				else if (canMove(2, 0, newMino)) canRotate = true, nx = 2, ny = 0;
+				else if (canMove(-1, 0, newMino)) canRotate = true, nx = -1, ny = 0;
+				else if (canMove(2, -1, newMino)) canRotate = true, nx = 2, ny = -1;
+				else if (canMove(-1, 2, newMino)) canRotate = true, nx = -1, ny = 2;
+			}
+		} else if (nextDirction === 1) {
+			if (dir === 1) {
+				if (canMove(0, 0, newMino)) canRotate = true, nx = 0, ny = 0;
+				else if (canMove(-2, 0, newMino)) canRotate = true, nx = -2, ny = 0;
+				else if (canMove(1, 0, newMino)) canRotate = true, nx = 1, ny = 0;
+				else if (canMove(-2, 1, newMino)) canRotate = true, nx = -2, ny = 1;
+				else if (canMove(1, -2, newMino)) canRotate = true, nx = 1, ny = -2;
+			} else if (dir === -1) {
+				if (canMove(0, 0, newMino)) canRotate = true, nx = 0, ny = 0;
+				else if (canMove(1, 0, newMino)) canRotate = true, nx = 1, ny = 0;
+				else if (canMove(-2, 0, newMino)) canRotate = true, nx = -2, ny = 0;
+				else if (canMove(1, 2, newMino)) canRotate = true, nx = 1, ny = 2;
+				else if (canMove(-2, -1, newMino)) canRotate = true, nx = -2, ny = -1;
+			}
+		} else if (nextDirction === 2) {
+			if (dir === 1) {
+				if (canMove(0, 0, newMino)) canRotate = true, nx = 0, ny = 0;
+				else if (canMove(-1, 0, newMino)) canRotate = true, nx = -1, ny = 0;
+				else if (canMove(2, 0, newMino)) canRotate = true, nx = 2, ny = 0;
+				else if (canMove(-1, -2, newMino)) canRotate = true, nx = -1, ny = -2;
+				else if (canMove(2, 1, newMino)) canRotate = true, nx = 2, ny = 1;
+			} else if (dir === -1) {
+				if (canMove(0, 0, newMino)) canRotate = true, nx = 0, ny = 0;
+				else if (canMove(1, 0, newMino)) canRotate = true, nx = 1, ny = 0;
+				else if (canMove(-2, 0, newMino)) canRotate = true, nx = -2, ny = 0;
+				else if (canMove(-2, 1, newMino)) canRotate = true, nx = -2, ny = 1;
+				else if (canMove(1, -2, newMino)) canRotate = true, nx = 1, ny = -2;
+			}
+		} else if (nextDirction === 3) {
+			if (dir === 1) {
+				if (canMove(0, 0, newMino)) canRotate = true, nx = 0, ny = 0;
+				else if (canMove(2, 0, newMino)) canRotate = true, nx = 2, ny = 0;
+				else if (canMove(-1, 0, newMino)) canRotate = true, nx = -1, ny = 0;
+				else if (canMove(2, -1, newMino)) canRotate = true, nx = 2, ny = -1;
+				else if (canMove(-1, 2, newMino)) canRotate = true, nx = -1, ny = 2;
+			} else if (dir === -1) {
+				if (canMove(0, 0, newMino)) canRotate = true, nx = 0, ny = 0;
+				else if (canMove(-1, 0, newMino)) canRotate = true, nx = -1, ny = 0;
+				else if (canMove(2, 0, newMino)) canRotate = true, nx = 2, ny = 0;
+				else if (canMove(-1, -2, newMino)) canRotate = true, nx = -1, ny = -2;
+				else if (canMove(2, 1, newMino)) canRotate = true, nx = 2, ny = 1;
+			}
+		}
+	}
+
+	// 回転
+	if (canRotate) {
 		block.shape = newMino;
+		block.x += nx;
+		block.y += ny;
 		fixInterval = pastTime;
 		fixMoveCount++;
+		block.dir = nextDirction;
+		
+		// Tspin判定
+		if (block.type === TYPE.T) {
+			let count = 0;
+			// 左側
+			if (block.x === -1) {
+				count += 2;
+			} else {
+				if (field[block.y][block.x] !== TYPE.NON) count++;
+				if (block.y + 2 >= FIELD_ROW) {
+					count++;
+				} else {
+					if (field[block.y + 2][block.x] !== TYPE.NON) count++;
+				}
+			}
+			// 右側
+			if (block.x + 2 === FIELD_COL) {
+				count += 2;
+			} else {
+				if (field[block.y][block.x + 2] !== TYPE.NON) count++;
+				if (block.y + 2 >= FIELD_ROW) {
+					count++;
+				} else {
+					if (field[block.y + 2][block.x + 2] !== TYPE.NON) count++;
+				}
+			}
+
+			if (count >= 3) isTspin = true;
+			else isTspin = false;
+		}
 	}
 }
 
 function update() {
 	if (gameOver) return;
-	if (frameCount % 3 == 0) {
-		if (isPressed[KEY.left]) if (canMove(-1, 0)) {
+
+	if (!isMovedLeft && isPressed[KEY.left]) {
+		isMovedLeft = true;
+		if (canMove(-1, 0)) {
 			block.x--;
 			fixInterval = pastTime;
 			fixMoveCount++;
+			isTspin = false;
 		}
-		if (isPressed[KEY.right]) if (canMove(1, 0)) {
+	}
+	if (!isMovedRight && isPressed[KEY.right]) {
+		isMovedRight = true;
+		if (canMove(1, 0)) {
 			block.x++;
 			fixInterval = pastTime;
 			fixMoveCount++;
-		}
-		if (isPressed[KEY.down]) if (canMove(0, 1)) {
-			block.y++;
-			fixInterval = pastTime;
-			if (lowestHeight < block.y) {
-				fixMoveCount = 0;
-			}
-			lowestHeight = Math.max(lowestHeight, block.y);
+			isTspin = false;
 		}
 	}
+
+	// オートリピート
+	if ((pastTime - autoRepeatDelay) > AUTO_REPEAT_DELAY_MAX) {
+		if (frameCount % 3 == 0) if (isMovedLeft && isPressed[KEY.left]) if (canMove(-1, 0)) {
+			block.x--;
+			fixInterval = pastTime;
+			fixMoveCount++;
+			isTspin = false;
+		}
+		if (frameCount % 3 == 0) if (isMovedRight && isPressed[KEY.right]) if (canMove(1, 0)) {
+			block.x++;
+			fixInterval = pastTime;
+			fixMoveCount++;
+			isTspin = false;
+		}
+	}
+	if (frameCount % 3 == 0) if (isPressed[KEY.down]) if (canMove(0, 1)) {
+		block.y++;
+		fixInterval = pastTime;
+		if (lowestHeight < block.y) {
+			fixMoveCount = 0;
+		}
+		lowestHeight = Math.max(lowestHeight, block.y);
+		isTspin = false;
+	}
+
 	if (!isHardDropped && isPressed[KEY.hardDrop]) {
 		isHardDropped = true;
 		let bottom = 0;
@@ -281,11 +433,11 @@ function update() {
 	}
 	if (!isRotatedCW && isPressed[KEY.rotateCW]) {
 		isRotatedCW = true;
-		rotateBlock(0);
+		rotateBlock(1);
 	}
 	if (!isRotatedCCW && isPressed[KEY.rotateCCW]) {
 		isRotatedCCW = true;
-		rotateBlock(1);
+		rotateBlock(-1);
 	}
 	if (!isHolded && isPressed[KEY.hold]) {
 		isHolded = true;
@@ -298,8 +450,8 @@ function update() {
 			setBlock(tmp);
 		}
 	}
-	// 設置
-	if (pastTime - fixInterval > FIX_INTERVAL_MAX || fixMoveCount > FIX_MOVE_COUNT_MAX) {
+	// 強制設置
+	if (pastTime - fixInterval > FIX_INTERVAL_MAX || fixMoveCount >= FIX_MOVE_COUNT_MAX) {
 		if (!canMove(0, 1)) {
 			fixBlock();
 		}
@@ -364,18 +516,16 @@ function drawText() {
 	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 40);
 	s = "TIME";
 	w = con.measureText(s).width;
-	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 180);
-	s = "LINE";
+	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 200);
+	s = "LINES";
 	w = con.measureText(s).width;
 	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 300);
+	s = "T-SPINS";
+	w = con.measureText(s).width;
+	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 400);
 	s = "NEXT";
 	w = con.measureText(s).width;
 	con.fillText(s, HOLD_WIDTH + FIELD_WIDTH + NEXT_WIDTH / 2 - w / 2, 40);
-
-	// drawLines();
-	s = zeroPadding(lineCount, 4);
-	w = con.measureText(s).width;
-	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 300 + fontSize + 10);
 
 	// drawTime();
 	let msec = (pastTime % 1000) / 10;
@@ -387,7 +537,17 @@ function drawText() {
 	min = Math.floor(min);
 	s = `${zeroPadding(min, 2)}:${zeroPadding(sec, 2)}.${zeroPadding(msec, 2)}`;
 	w = con.measureText(s).width;
-	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 180 + fontSize + 10);
+	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 200 + fontSize + 10);
+
+	// drawLines();
+	s = zeroPadding(lineCount, 4);
+	w = con.measureText(s).width;
+	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 300 + fontSize + 10);
+
+	// drawTspin();
+	s = zeroPadding(TspinCount, 4);
+	w = con.measureText(s).width;
+	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 400 + fontSize + 10);
 
 	// ゲームオーバー
 	if (gameOver) {
@@ -458,9 +618,9 @@ function mainLoop() {
 	if (nowFrame > frameCount) {
 		// let cnt = 0;
 		while (nowFrame > frameCount) {
+			// if (++cnt >= 4) break;
 			frameCount++;
 			update();
-			// if (++cnt >= 4) break;
 		}
 		draw();
 	}
@@ -473,12 +633,14 @@ document.onkeydown = function (e) {
 	switch (e.keyCode) {
 		case 37: // 矢印左
 			isPressed[KEY.left] = true;
+			if (!isMovedLeft) autoRepeatDelay = pastTime;
 			break;
 		case 38: // 矢印上
 			isPressed[KEY.hardDrop] = true;
 			break;
 		case 39: // 矢印右
 			isPressed[KEY.right] = true;
+			if (!isMovedRight) autoRepeatDelay = pastTime;
 			break;
 		case 40: // 矢印下
 			isPressed[KEY.down] = true;
@@ -500,6 +662,7 @@ document.onkeyup = function (e) {
 	switch (e.keyCode) {
 		case 37: // 矢印左
 			isPressed[KEY.left] = false;
+			isMovedLeft = false;
 			break;
 		case 38: // 矢印上
 			isPressed[KEY.hardDrop] = false;
@@ -507,6 +670,7 @@ document.onkeyup = function (e) {
 			break;
 		case 39: // 矢印右
 			isPressed[KEY.right] = false;
+			isMovedRight = false;
 			break;
 		case 40: // 矢印下
 			isPressed[KEY.down] = false;
