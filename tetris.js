@@ -37,7 +37,7 @@ const MODE = [
 	},
 	{
 		id: 2,
-		string: "INFINITY",
+		string: "IMPOSSIBLE",
 		speed: -20
 	}
 ];
