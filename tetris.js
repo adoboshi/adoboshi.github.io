@@ -8,10 +8,9 @@ const HOLD_WIDTH = 6 * BLOCK_SIZE;
 const FIELD_WIDTH = BLOCK_SIZE * FIELD_COL;
 const NEXT_WIDTH = 6 * BLOCK_SIZE;
 const SCREEN_WIDTH = FIELD_WIDTH + NEXT_WIDTH + HOLD_WIDTH;
-const FREE_FALL_SPEED = 500;
 const FIX_INTERVAL_MAX = 500;	// ミノが接地してから固定されるまでの時間[ms]
 const FIX_MOVE_COUNT_MAX = 15;
-const AUTO_REPEAT_DELAY_MAX = 200;	// 横を押しっぱなしにした時に、
+const AUTO_REPEAT_DELAY_MAX = 200;	// 横を押しっぱなしにした時にオートリピートが有効になるまでの時間[ms]
 const NEXT_DISPLAY_NUM = 6;
 
 const KEY = {
@@ -22,8 +21,26 @@ const KEY = {
 	rotateCW: 4,
 	rotateCCW: 5,
 	hold: 6,
-	MAX: 7
+	enter: 7,
+	MAX: 8
 };
+const MODE = [
+	{
+		id: 0,
+		string: "NORMAL",
+		speed: 20
+	},
+	{
+		id: 1,
+		string: "HARD",
+		speed: 1
+	},
+	{
+		id: 2,
+		string: "INFINITY",
+		speed: -20
+	}
+];
 const TYPE = {
 	NON: 0,
 	J: 1,
@@ -92,7 +109,8 @@ MINO[TYPE.T] = {
 	],
 	color: "#C5C"
 };
-let isPressed = new Array(KEY.MAX).fill(false);
+let isPressed = new Array(KEY.MAX).fill(false);	// キーが押されているかどうか
+let isMoved = new Array(KEY.MAX).fill(false);	// キーが押された際、実際に回転したかどうか
 let can = document.getElementById("can");
 let con = can.getContext("2d");
 let field = new Array(FIELD_ROW);
@@ -100,15 +118,11 @@ let next = new Array();
 let hold;
 let frameCount = 0;
 let startTime;
-let isRotatedCW = false;	// スペースキーが押された時に回転したかどうか（押しっぱなしで回転することを防ぐ）
-let isRotatedCCW = false;	// スペースキーが押された時に回転したかどうか（押しっぱなしで回転することを防ぐ）
-let isHardDropped = false;	// ハードドロップしたか
-let isHolded = false;	// holdしたか
-let isMovedRight = false;	// 右移動したか
-let isMovedLeft = false;	// 左移動したか
 let gameOver = false;
 let lineCount = 0;
+let TetrisCount = 0;
 let TspinCount = 0;
+let score = 0;
 let isTspin = false;
 let fixInterval = 0;
 let fixMoveCount = 0;	// 移動か回転が行われるたびに+1（下に落下すると0に戻る）。FIX_MOVE_COUNT_MAXに達すると強制設置
@@ -116,6 +130,9 @@ let lowestHeight;	// そのミノが経験した最も低い高さ。最小値�
 let autoRepeatDelay = 0;	// AUTO_REPEAT_DELAY_MAX未満のときはオートリピートしない
 let pastTime = 0;
 let block = new Object();
+let freeFallSpeed = 10;
+let isMenu = true;
+let mode = 0;
 
 function setBlock(type) {
 	block.type = type;
@@ -155,16 +172,20 @@ function getRandom(num) {
 	return Math.floor(Math.random() * (num + 1));
 }
 
+function initGame() {
+	for (let y = 0; y < FIELD_ROW; y++) {
+		field[y] = new Array(FIELD_COL).fill(TYPE.NON);
+	}
+	freeFallSpeed = MODE[mode].speed;
+	gameOver = false;
+	spwanBlock();
+}
+
 function init() {
 	can.height = SCREEN_HEIGHT;
 	can.width = SCREEN_WIDTH;
 	can.style.border = "4px solid #555";
-	for (let y = 0; y < FIELD_ROW; y++) {
-		field[y] = new Array(FIELD_COL).fill(TYPE.NON);
-	}
-	setInterval(freeFall, FREE_FALL_SPEED);
-
-	spwanBlock();
+	startTime = performance.now();
 }
 
 function canMove(mx, my, newMino) {
@@ -202,10 +223,12 @@ function fixBlock() {
 	if (isOffScreen) gameOver = true;
 	checkClear();
 	spwanBlock();
-	isHolded = false;
+	isMoved[KEY.hold] = false;
+
 }
 
 function checkClear() {
+	let clearLineCount = 0;
 	for (let y = 0; y < FIELD_ROW; y++) {
 		let isFilled = true;
 		for (let x = 0; x < FIELD_COL; x++) {
@@ -215,6 +238,7 @@ function checkClear() {
 			}
 		}
 		if (isFilled) {
+			clearLineCount++;
 			lineCount++;
 			if (isTspin) TspinCount++;
 			for (let ny = y; ny > 0; ny--) {
@@ -224,10 +248,10 @@ function checkClear() {
 			}
 		}
 	}
+	if (clearLineCount >= 4) TetrisCount++;
 }
 
 function freeFall() {
-	if (gameOver) return;
 	if (canMove(0, 1)) {
 		block.y++;
 		fixInterval = pastTime;
@@ -236,7 +260,6 @@ function freeFall() {
 		}
 		lowestHeight = Math.max(lowestHeight, block.y);
 	}
-	draw();
 }
 
 // ミノの回転（dir: 1でCW、-1でCCW）
@@ -341,7 +364,7 @@ function rotateBlock(dir) {
 		fixInterval = pastTime;
 		fixMoveCount++;
 		block.dir = nextDirction;
-		
+
 		// Tspin判定
 		if (block.type === TYPE.T) {
 			let count = 0;
@@ -373,12 +396,34 @@ function rotateBlock(dir) {
 		}
 	}
 }
+function updateMenu() {
+	const MODE_MAX = MODE.length;
+	if (!isMoved[KEY.down] && isPressed[KEY.down]) {
+		isMoved[KEY.down] = true;
+		mode = (mode + 1) % MODE_MAX;
+	}
+	if (!isMoved[KEY.hardDrop] && isPressed[KEY.hardDrop]) {
+		isMoved[KEY.hardDrop] = true;
+		mode = (mode - 1 + MODE_MAX) % MODE_MAX;
+	}
+	if (!isMoved[KEY.enter] && isPressed[KEY.enter]) {
+		isMoved[KEY.enter] = true;
+		isMenu = false;
+		initGame();
+	}
+}
 
-function update() {
-	if (gameOver) return;
-
-	if (!isMovedLeft && isPressed[KEY.left]) {
-		isMovedLeft = true;
+function updateGame() {
+	if (gameOver) {
+		if (!isMoved[KEY.enter] && isPressed[KEY.enter]) {
+			isMoved[KEY.enter] = true;
+			isMenu = true;
+		}
+		return;
+	}
+	// 操作
+	if (!isMoved[KEY.left] && isPressed[KEY.left]) {
+		isMoved[KEY.left] = true;
 		if (canMove(-1, 0)) {
 			block.x--;
 			fixInterval = pastTime;
@@ -386,8 +431,8 @@ function update() {
 			isTspin = false;
 		}
 	}
-	if (!isMovedRight && isPressed[KEY.right]) {
-		isMovedRight = true;
+	if (!isMoved[KEY.right] && isPressed[KEY.right]) {
+		isMoved[KEY.right] = true;
 		if (canMove(1, 0)) {
 			block.x++;
 			fixInterval = pastTime;
@@ -398,31 +443,36 @@ function update() {
 
 	// オートリピート
 	if ((pastTime - autoRepeatDelay) > AUTO_REPEAT_DELAY_MAX) {
-		if (frameCount % 3 == 0) if (isMovedLeft && isPressed[KEY.left]) if (canMove(-1, 0)) {
+		if (frameCount % 3 == 0) if (isMoved[KEY.left] && isPressed[KEY.left]) if (canMove(-1, 0)) {
 			block.x--;
 			fixInterval = pastTime;
 			fixMoveCount++;
 			isTspin = false;
 		}
-		if (frameCount % 3 == 0) if (isMovedRight && isPressed[KEY.right]) if (canMove(1, 0)) {
+		if (frameCount % 3 == 0) if (isMoved[KEY.right] && isPressed[KEY.right]) if (canMove(1, 0)) {
 			block.x++;
 			fixInterval = pastTime;
 			fixMoveCount++;
 			isTspin = false;
 		}
 	}
-	if (frameCount % 3 == 0) if (isPressed[KEY.down]) if (canMove(0, 1)) {
-		block.y++;
-		fixInterval = pastTime;
-		if (lowestHeight < block.y) {
-			fixMoveCount = 0;
+	if (isPressed[KEY.down]) {
+		isMoved[KEY.down] = true;
+		if (frameCount % 3 == 0) {
+			if (canMove(0, 1)) {
+				block.y++;
+				fixInterval = pastTime;
+				if (lowestHeight < block.y) {
+					fixMoveCount = 0;
+				}
+				lowestHeight = Math.max(lowestHeight, block.y);
+				isTspin = false;
+			}
 		}
-		lowestHeight = Math.max(lowestHeight, block.y);
-		isTspin = false;
 	}
 
-	if (!isHardDropped && isPressed[KEY.hardDrop]) {
-		isHardDropped = true;
+	if (!isMoved[KEY.hardDrop] && isPressed[KEY.hardDrop]) {
+		isMoved[KEY.hardDrop] = true;
 		let bottom = 0;
 		while (canMove(0, bottom)) {
 			bottom++;
@@ -431,16 +481,16 @@ function update() {
 		block.y += bottom;
 		fixBlock();
 	}
-	if (!isRotatedCW && isPressed[KEY.rotateCW]) {
-		isRotatedCW = true;
+	if (!isMoved[KEY.rotateCW] && isPressed[KEY.rotateCW]) {
+		isMoved[KEY.rotateCW] = true;
 		rotateBlock(1);
 	}
-	if (!isRotatedCCW && isPressed[KEY.rotateCCW]) {
-		isRotatedCCW = true;
+	if (!isMoved[KEY.rotateCCW] && isPressed[KEY.rotateCCW]) {
+		isMoved[KEY.rotateCCW] = true;
 		rotateBlock(-1);
 	}
-	if (!isHolded && isPressed[KEY.hold]) {
-		isHolded = true;
+	if (!isMoved[KEY.hold] && isPressed[KEY.hold]) {
+		isMoved[KEY.hold] = true;
 		if (hold === undefined) {
 			hold = block.type;
 			spwanBlock();
@@ -451,11 +501,22 @@ function update() {
 		}
 	}
 	// 強制設置
-	if (pastTime - fixInterval > FIX_INTERVAL_MAX || fixMoveCount >= FIX_MOVE_COUNT_MAX) {
+	if ((pastTime - fixInterval > FIX_INTERVAL_MAX) || (fixMoveCount >= FIX_MOVE_COUNT_MAX)) {
 		if (!canMove(0, 1)) {
 			fixBlock();
 		}
 	}
+	// 自由落下
+	if (freeFallSpeed > 0) {
+		if (frameCount % freeFallSpeed === 0) freeFall();
+	} else {
+		for (let i = 0; i <= Math.min(FIELD_ROW_DISPLAY, -1 * freeFallSpeed); i++) freeFall();
+	}
+}
+
+function update() {
+	if (isMenu) updateMenu();
+	else updateGame();
 }
 
 function zeroPadding(num, len) {
@@ -507,27 +568,25 @@ function drawHold() {
 }
 
 function drawText() {
-	let fontSize = 30;
+	let fontSize = 28;
 	con.font = fontSize + "px sans-serif";
 	con.fillStyle = "white";
-	let w, s;
-	s = "HOLD";
-	w = con.measureText(s).width;
-	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 40);
-	s = "TIME";
-	w = con.measureText(s).width;
-	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 200);
-	s = "LINES";
-	w = con.measureText(s).width;
-	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 300);
-	s = "T-SPINS";
-	w = con.measureText(s).width;
-	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 400);
+	let w, s, h;
+	const top = 35;
+	const mid = 160;
+	const interval = 95;
 	s = "NEXT";
 	w = con.measureText(s).width;
-	con.fillText(s, HOLD_WIDTH + FIELD_WIDTH + NEXT_WIDTH / 2 - w / 2, 40);
+	con.fillText(s, HOLD_WIDTH + FIELD_WIDTH + NEXT_WIDTH / 2 - w / 2, top);
+	s = "HOLD";
+	w = con.measureText(s).width;
+	con.fillText(s, HOLD_WIDTH / 2 - w / 2, top);
 
 	// drawTime();
+	s = "TIME";
+	w = con.measureText(s).width;
+	h = mid + interval * 0;
+	con.fillText(s, HOLD_WIDTH / 2 - w / 2, h);
 	let msec = (pastTime % 1000) / 10;
 	let sec = pastTime / 1000;
 	let min = sec / 60;
@@ -537,17 +596,34 @@ function drawText() {
 	min = Math.floor(min);
 	s = `${zeroPadding(min, 2)}:${zeroPadding(sec, 2)}.${zeroPadding(msec, 2)}`;
 	w = con.measureText(s).width;
-	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 200 + fontSize + 10);
+	con.fillText(s, HOLD_WIDTH / 2 - w / 2, h + fontSize + 10);
 
 	// drawLines();
+	s = "LINES";
+	w = con.measureText(s).width;
+	h = mid + interval * 1;
+	con.fillText(s, HOLD_WIDTH / 2 - w / 2, h);
 	s = zeroPadding(lineCount, 4);
 	w = con.measureText(s).width;
-	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 300 + fontSize + 10);
+	con.fillText(s, HOLD_WIDTH / 2 - w / 2, h + fontSize + 10);
 
-	// drawTspin();
+	// drawTetris();
+	s = "TETRIS";
+	w = con.measureText(s).width;
+	h = mid + interval * 2;
+	con.fillText(s, HOLD_WIDTH / 2 - w / 2, h);
+	s = zeroPadding(TetrisCount, 4);
+	w = con.measureText(s).width;
+	con.fillText(s, HOLD_WIDTH / 2 - w / 2, h + fontSize + 10);
+
+	// drawTspins();
+	s = "T-SPINS";
+	w = con.measureText(s).width;
+	h = mid + interval * 3;
+	con.fillText(s, HOLD_WIDTH / 2 - w / 2, h);
 	s = zeroPadding(TspinCount, 4);
 	w = con.measureText(s).width;
-	con.fillText(s, HOLD_WIDTH / 2 - w / 2, 400 + fontSize + 10);
+	con.fillText(s, HOLD_WIDTH / 2 - w / 2, h + fontSize + 10);
 
 	// ゲームオーバー
 	if (gameOver) {
@@ -562,14 +638,20 @@ function drawText() {
 		w = con.measureText(s).width;
 		// con.strokeText(s, HOLD_WIDTH + FIELD_WIDTH / 2 - w / 2, SCREEN_HEIGHT / 2 + fontSize / 2);
 		con.fillText(s, HOLD_WIDTH + FIELD_WIDTH / 2 - w / 2, SCREEN_HEIGHT / 2 + fontSize / 2);
+		
+		if(frameCount%60 < 60 * 0.7) {
+			con.font = BLOCK_SIZE + "px sans-serif";
+			s = "Press [Enter]";
+			w = con.measureText(s).width;
+			con.fillText(s, HOLD_WIDTH + FIELD_WIDTH / 2 -w/2, SCREEN_HEIGHT / 2 + 100);
+			s = "to Return Menu";
+			w = con.measureText(s).width;
+			con.fillText(s, HOLD_WIDTH + FIELD_WIDTH / 2 -w/2, SCREEN_HEIGHT / 2 + 130);
+		}
 	}
 }
 
-function draw() {
-	// con.clearRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-	con.fillStyle = "#333";
-	con.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-
+function drawGame() {
 	// 背景の描画
 	for (let y = FIELD_ROW - FIELD_ROW_DISPLAY; y < FIELD_ROW; y++) {
 		for (let x = 0; x < FIELD_COL; x++) {
@@ -604,10 +686,57 @@ function draw() {
 	drawText();
 }
 
+function drawMenu() {
+	let w, s;
+	// drawTitle()
+	con.font = "60px sans-serif";
+	con.fillStyle = "white";
+	s = "TETRIS";
+	w = con.measureText(s).width;
+	con.fillText(s, SCREEN_WIDTH / 2 - w / 2, 150);
+	
+	con.font = "22px sans-serif";
+	con.fillStyle = "white";
+	s = "Select Difficulty and Press [Enter] to Start";
+	w = con.measureText(s).width;
+	con.fillText(s, SCREEN_WIDTH / 2 - w / 2, 230);
+	
+	// drawDifficulty()
+	const MODE_MAX = MODE.length;
+	for (let i = 0; i < MODE_MAX; i++) {
+		if (i === mode) {
+			con.font = "36px sans-serif";
+			con.fillStyle = "yellow";
+		}
+		else {
+			con.font = "28px sans-serif";
+			con.fillStyle = "white";
+		}
+		s = MODE[i].string;
+		w = con.measureText(s).width;
+		let x = SCREEN_WIDTH / 2 - w / 2;
+		let y = (i + 1) * 50 + 250;
+		con.fillText(s, x, y);
+		// let padding = 0;
+		// if (i === mode) {
+		// 	con.strokeRect(x - padding, y - 28 - padding, w + padding * 2, 28 + 2 * padding);
+		// }
+	}
+}
+
+function draw() {
+	// con.clearRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+	con.fillStyle = "#333";
+	con.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+	if (isMenu) drawMenu();
+	else drawGame();
+
+}
+
 
 window.onload = function () {
 	this.init();
-	startTime = performance.now();
 	mainLoop();
 }
 // メインループ
@@ -629,18 +758,17 @@ function mainLoop() {
 
 document.onkeydown = function (e) {
 	e.preventDefault();
-	if (gameOver) return;
 	switch (e.keyCode) {
 		case 37: // 矢印左
 			isPressed[KEY.left] = true;
-			if (!isMovedLeft) autoRepeatDelay = pastTime;
+			if (!isMoved[KEY.left]) autoRepeatDelay = pastTime;
 			break;
 		case 38: // 矢印上
 			isPressed[KEY.hardDrop] = true;
 			break;
 		case 39: // 矢印右
 			isPressed[KEY.right] = true;
-			if (!isMovedRight) autoRepeatDelay = pastTime;
+			if (!isMoved[KEY.right]) autoRepeatDelay = pastTime;
 			break;
 		case 40: // 矢印下
 			isPressed[KEY.down] = true;
@@ -654,37 +782,46 @@ document.onkeydown = function (e) {
 		case 88: // X
 			isPressed[KEY.rotateCW] = true;
 			break;
+		case 13: // Enter
+			isPressed[KEY.enter] = true;
+			break;
 	}
 }
 
 document.onkeyup = function (e) {
-	if (gameOver) return;
 	switch (e.keyCode) {
 		case 37: // 矢印左
 			isPressed[KEY.left] = false;
-			isMovedLeft = false;
+			isMoved[KEY.left] = false;
 			break;
 		case 38: // 矢印上
 			isPressed[KEY.hardDrop] = false;
-			isHardDropped = false;
+			isMoved[KEY.hardDrop] = false;
 			break;
 		case 39: // 矢印右
 			isPressed[KEY.right] = false;
-			isMovedRight = false;
+			isMoved[KEY.right] = false;
 			break;
 		case 40: // 矢印下
 			isPressed[KEY.down] = false;
+			isMoved[KEY.down] = false;
 			break;
 		case 32: // スペース
 			isPressed[KEY.hold] = false;
+			// fixBlock()にて実施
+			// isMoved[KEY.hold] = false;
 			break;
 		case 90: // Z
 			isPressed[KEY.rotateCCW] = false;
-			isRotatedCCW = false;
+			isMoved[KEY.rotateCCW] = false;
 			break;
 		case 88: // X
 			isPressed[KEY.rotateCW] = false;
-			isRotatedCW = false;
+			isMoved[KEY.rotateCW] = false;
+			break;
+		case 13: // Enter
+			isPressed[KEY.enter] = false;
+			isMoved[KEY.enter] = false;
 			break;
 	}
 }
