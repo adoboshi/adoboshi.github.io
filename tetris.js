@@ -115,14 +115,14 @@ let can = document.getElementById("can");
 let con = can.getContext("2d");
 let field = new Array(FIELD_ROW);
 let next = new Array();
-let hold;
+let hold = undefined;
 let frameCount = 0;
-let startTime;
+let startTime;	// ゲームを起動した時間
+let newGameTime;	// ゲームを開始した時間
 let gameOver = false;
 let lineCount = 0;
 let TetrisCount = 0;
 let TspinCount = 0;
-let score = 0;
 let isTspin = false;
 let fixInterval = 0;
 let fixMoveCount = 0;	// 移動か回転が行われるたびに+1（下に落下すると0に戻る）。FIX_MOVE_COUNT_MAXに達すると強制設置
@@ -178,7 +178,13 @@ function initGame() {
 	}
 	freeFallSpeed = MODE[mode].speed;
 	gameOver = false;
+	hold = undefined;
+	next = new Array();
+	lineCount = 0;
+	TetrisCount = 0;
+	TspinCount = 0;
 	spwanBlock();
+	newGameTime = performance.now();
 }
 
 function init() {
@@ -742,7 +748,7 @@ window.onload = function () {
 // メインループ
 function mainLoop() {
 	let nowTime = performance.now();
-	if (!gameOver) pastTime = nowTime - startTime;
+	if (!gameOver) pastTime = nowTime - newGameTime;
 	let nowFrame = (nowTime - startTime) / GAME_FPS;
 	if (nowFrame > frameCount) {
 		// let cnt = 0;
