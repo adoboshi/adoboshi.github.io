@@ -33,7 +33,7 @@ const MODE = [
 	{
 		id: 1,
 		string: "HARD",
-		speed: 1
+		speed: 2
 	},
 	{
 		id: 2,
@@ -115,7 +115,7 @@ let can = document.getElementById("can");
 let con = can.getContext("2d");
 let field = new Array(FIELD_ROW);
 let next = new Array();
-let hold = undefined;
+let hold = TYPE.NON;
 let frameCount = 0;
 let startTime;	// ゲームを起動した時間
 let newGameTime;	// ゲームを開始した時間
@@ -142,6 +142,12 @@ function setBlock(type) {
 	block.x = Math.floor(FIELD_COL / 2 - block.size / 2);
 	block.y = FIELD_ROW - FIELD_ROW_DISPLAY - 2;
 	block.dir = 0;	// 0: Noreth, 1: East, 2: South, 3: West
+	if (!canMove(0, 0)) gameOver = true;
+	
+	fixInterval = pastTime;
+	fixMoveCount = 0;
+	isTspin = false;
+	lowestHeight = block.y;
 }
 
 // 新しいブロックの生成
@@ -149,11 +155,6 @@ function spwanBlock() {
 	if (gameOver) return;
 	if (next.length <= NEXT_DISPLAY_NUM) generateNext();
 	setBlock(next.shift());
-	fixInterval = pastTime;
-	fixMoveCount = 0;
-	isTspin = false;
-	lowestHeight = block.y;
-	if (!canMove(0, 0)) gameOver = true;
 }
 
 // 配列nextにネクストを生成する（７種１巡）
@@ -178,7 +179,7 @@ function initGame() {
 	}
 	freeFallSpeed = MODE[mode].speed;
 	gameOver = false;
-	hold = undefined;
+	hold = TYPE.NON;
 	next = new Array();
 	lineCount = 0;
 	TetrisCount = 0;
@@ -497,7 +498,7 @@ function updateGame() {
 	}
 	if (!isMoved[KEY.hold] && isPressed[KEY.hold]) {
 		isMoved[KEY.hold] = true;
-		if (hold === undefined) {
+		if (hold === TYPE.NON) {
 			hold = block.type;
 			spwanBlock();
 		} else {
@@ -559,7 +560,7 @@ function drawNext() {
 }
 
 function drawHold() {
-	if (hold === undefined) return;
+	if (hold === TYPE.NON) return;
 	let shape = MINO[hold].shape;
 	for (let y = 0; y < shape.length; y++) {
 		for (let x = 0; x < shape.length; x++) {

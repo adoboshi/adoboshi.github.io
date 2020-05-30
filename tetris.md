@@ -1,18 +1,21 @@
 ---
 layout: page
-title: Tetris
+title: テトリス
 ---
 <canvas id="can"></canvas>
 <script src="tetris.js"></script>
 
 
-## 概要
-JavaScriptとcanvas（html5）で作りました。製作期間は約一週間。<br>
-ルールはテトリスのガイドラインに（ほぼ）準拠しているはず。<br>
-[ソースコード（github）](https://github.com/adoboshi/adoboshi.github.io/blob/master/tetris.js)
+# 概要
+JavaScriptとcanvas（html5）で作りました。<br>
+主要なルールはテトリスのガイドラインに準拠しているはず。<br>
+面白そうなルールとか思いついたら追加していきます。<br>
+
+コード全文→[ソースコード（github）](https://github.com/adoboshi/adoboshi.github.io/blob/master/tetris.js)<br>
+バグがあったら[Twitterアカウント](https://twitter.com/_adoboshi)に教えていただけると喜びます。
 
 ***
-## 操作方法
+# 操作方法
 - 左右移動：←、→
 - ソフトドロップ：↓
 - ハードドロップ：↑
@@ -21,42 +24,50 @@ JavaScriptとcanvas（html5）で作りました。製作期間は約一週間�
 - ホールド：スペース
 
 ***
-## 参考にしたサイト
-### [プログラミング講座 第13回【テトリスを作る(1)/JavaScript】](https://youtu.be/LJlKaTwtSdI)
-Youtube, Akichonさん
+# 作ってみた感想<br>
+必要なのは二次元配列の全探索くらいなので、アルゴリズム的にはせいぜいAtoderの茶～緑diffといったところでしょうか（競プロer目線）<br>
+しかし、実装は激重でした……。コメントを含めると８００行以上ですね。<br>
+幸い大きなバグにハマることはなく、順調に作れました。もしかしたら競プロで身につけた実装力のおかげかもしれません（？）
 
+***
+# 参考にしたサイト
+- [プログラミング講座 第13回【テトリスを作る(1)/JavaScript】](https://youtu.be/LJlKaTwtSdI)
+―Youtube, Akichonさん<br>
 JavaScriptでゲームを作る方法をこの動画で学びました。テトリスが完成するまでの過程を全て見ることができ、大変参考になりました。
 
-### [テトリス（tetris）のガイドラインを理解する](https://qiita.com/ki_ki33/items/35566f052af7b916607b)
-Qiita, @ki_ki33さん
-
+- [テトリス（tetris）のガイドラインを理解する](https://qiita.com/ki_ki33/items/35566f052af7b916607b)
+―Qiita, @ki_ki33さん<br>
 テトリスの公式ルール（＝ガイドライン）がわかりやすく解説されています。ここで紹介されている要素は全て実装しました。
 
-### [SRS (Super Rotation System)](https://tetrisch.github.io/main/srs.html)
-Tetrisチャンネルさん
-
+- [SRS (Super Rotation System)](https://tetrisch.github.io/main/srs.html)
+―Tetrisチャンネルさん<br>
 ガイドラインに含まれる項目のうち、SRS（スーパーローテーションシステム）の内容が具体的に示されています。SRSによりTスピンなどの回転入れが可能になります。
 
-### [ワールドルールテトリスの作り方またはRust入門した感想的な何か](https://qiita.com/namn1125/items/15ddea322c086aa1b0d3)
-Qiita, @namn1125さん
-
+- [ワールドルールテトリスの作り方またはRust入門した感想的な何か](https://qiita.com/namn1125/items/15ddea322c086aa1b0d3)
+―Qiita, @namn1125さん<br>
 Rustでガイドライン準拠テトリスを作られた先駆者様（？）です。この記事を読んで各機能の実装のイメージがつかめました。
 
-### [テンプレ積み保管庫](http://waka.nu/tetris/)
-喜竹屋本舗さん
-
+- [テンプレ積み保管庫](http://waka.nu/tetris/)
+―喜竹屋本舗さん<br>
 各ミノの回転入れの形やTスピンの詳細などが載っています。
 
 ***
-## ToDo
+# 更新履歴
+- 2020/05/30: ホールドした際にミノの情報が正常に更新されないバグを修正。HARDの難易度を調整
+- 2020/05/17: とりあえず完成。製作期間は約一週間。
+
+***
+# ToDo
 - REN
 - Back-to-Back
-- パーフェクトクリア
+- パーフェクトクリア判定
+- T-spin mini判定
 - スコア実装
 - ~~メニュー実装~~
 - モード追加
 	- ~~難易度~~
 	- 40ライン
-	- スコアアタック（n分）
+	- スコアアタック（2分くらい）
 	- 堀
 - ランキング機能（バックエンド勉強後）
+- 対戦機能　vs.AI（いつか機械学習とかも勉強したいですね）
